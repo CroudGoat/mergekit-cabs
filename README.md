@@ -46,6 +46,122 @@ pip install -e ".[full]"    # モデル読み込み / AWA / mergekit レシピ�
 
 `import mergekit_cabs` するだけで `cabs` / `cabs_plus` が mergekit のレジストリに登録されます。
 
+## 完全な使用ステップ
+
+Step 0 から順に実行すれば、インストール直後からマージ済みモデルの検証まで完結します。
+
+### Step 0: 前提条件
+
+| 項目 | 要求 | 備考 |
+|------|------|------|
+| Python | 3.9 以上 | 開発・検証は 3.13 で実施 |
+| PyTorch | 2.0 以上 | CUDA 版推奨（CPU のみでも動作可） |
+| RAM | モデルサイズの 2〜3 倍 | 7B fp16 なら実質 16 GB 以上推奨。0.5B〜1B なら 8 GB でも可 |
+| ディスク | モデルサイズ × (入力数 + 1) | 入出力はすべて safetensors |
+| GPU | 任意 | `--cuda` 指定時のみ使用。省略時は CPU で完結 |
+
+ゲート付きモデル（Llama 系など）を使う場合は事前に `huggingface-cli login` を実行しておきます。
+
+### Step 1: インストールと動作確認
+
+```bash
+git clone https://github.com/CroudGoat/mergekit-cabs.git
+cd mergekit-cabs
+pip install -e ".[full]"     # mergekit / transformers / safetensors 等を含む
+pip install -e ".[dev]"      # テスト実行用（pytest）
+pytest tests/ -q             # 30 tests が pass すれば環境 OK
+```
+
+### Step 2: モデルの準備
+
+```bash
+# 例: ベース 1 + ファインチューン 2 を用意
+huggingface-cli download mistralai/Mistral-7B-v0.1
+huggingface-cli download WildMarcoroni-Variant1-7B
+huggingface-cli download WestSeverus-7B-DPO-v2
+```
+
+`recipes/cabs_2model.yml` のモデル名・`n` / `m` / `weight` を環境に合わせて編集します。
+レシピの `models` 列の**先頭**が CA スパース化の最優先（最も保護される）タスクベクトルになります。
+
+### Step 3: CABS でマージする
+
+```bash
+mergekit-cabs-yaml recipes/cabs_2model.yml ./output --cuda --lazy-unpickle
+```
+
+- `--cuda` を外せば CPU のみで実行（メモリが厳しいときは `--low-cpu-memory` を追加）
+- `--write-model-card` でマージ設定を焼き込んだモデルカードを同時生成
+- `--trust-remote-code` はカスタムアーキテクチャのモデルのときのみ付与
+
+完了すると `./output/` に safetensors 形式のマージ済みモデルとトークナイザが出力されます。
+
+### Step 4: マージ結果を検証する
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_id = "./output"
+tok = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype="auto")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = model.to(device).eval()
+
+inputs = tok("The meaning of life is", return_tensors="pt").to(device)
+with torch.no_grad():
+    out = model.generate(**inputs, max_new_tokens=64, do_sample=False)
+print(tok.decode(out[0], skip_special_tokens=True))
+```
+
+エラーなく生成できれば最低限の整合性は確保できています。品質の比較は元のファインチューン群
+や `task_arithmetic` マージとのベンチマーク（Perplexity、lm-evaluation-harness 等）で行ってください。
+
+### Step 5: CABS+（AWA）でスケーリング係数 λ を最適化する
+
+**(1)** タスクごとのキャリブレーションデータを JSONL で用意（1 行 1 例文）:
+
+```bash
+mkdir -p calibration
+cat > calibration/task_a.jsonl <<'EOF'
+{"text": "Question: ...? Answer: ..."}
+{"text": "..."}
+EOF
+```
+
+**(2)** 設定 JSON を作成（雛形: `recipes/awa_config.example.json`）:
+
+| キー | 内容 |
+|------|------|
+| `base_model` / `models` | ベースとファインチューン群（モデル ID またはローカルパス） |
+| `pruning` | `method`（`nm` / `magnitude`）, `n`, `m`, `consensus` |
+| `awa` | `n_generations`（既定 30）, `popsize`（null = 自動設定）, `bounds`, `sigma0`, `alpha`, `beta`, `seed` |
+| `tasks` | `name`, `data`（JSONL パス）, `max_examples`, `max_len` |
+| `device` / `dtype` / `batch_size` | 実行環境に合わせて指定 |
+| `output_dir` / `save_merged` | 出力先 / マージ済みモデルの同時保存 |
+
+**(3)** 実行:
+
+```bash
+mergekit-cabs awa --config awa_config.json
+```
+
+**(4)** 出力物:
+
+- `awa_result.json` — 最適係数 λ*、世代ごとの履歴、タスク別損失
+- `cabs_plus_recipe.yml` — λ* を書き込んだレシピ。Step 3 と同じコマンドでそのままマージ可能
+- `save_merged: true` の場合はマージ済みモデルも同時保存
+
+### Step 6: うまくいかないとき
+
+| 症状 | 対処 |
+|------|------|
+| `Unknown merge method: cabs` | 素の `mergekit-yaml` ではなく **`mergekit-cabs-yaml`** を使う（メソッド登録は本パッケージの import 時に行われる） |
+| CUDA out of memory | `--low-cpu-memory` を追加 / `m` を小さくしてスパース化を強める / `dtype: float16` を確認 |
+| CPU で遅い・メモリ不足 | `--lazy-unpickle` を必ず付ける。まず 0.5B〜1B 級で試す |
+| ゲート付きモデルで 401 エラー | `huggingface-cli login` 後に再実行 |
+| マージ結果の品質が低い | `consensus: ties` を明示 / `normalize: true` を試す / `weight` を 1.0 近傍に |
+
 ## 使い方
 
 ### 1. mergekit レシピで使う（推奨）
@@ -157,8 +273,9 @@ pip install -e ".[dev]"
 pytest tests/
 ```
 
-28 件のテストが含まれます（BS マスクの正しさ、CA の非重複保証、公式実装との一致、
-TIES 合意、CMA-ES の収束・境界・σ/C の整合、非対称適応度など）。
+30 件のテストが含まれます（BS マスクの正しさ、CA の非重複保証、公式実装との一致、
+TIES 合意、CMA-ES の収束・境界・σ/C の整合、非対称適応度、および実 mergekit を用いた
+小型 Llama 3 個のエンドツーエンドマージ）。
 
 ## ライセンス
 
