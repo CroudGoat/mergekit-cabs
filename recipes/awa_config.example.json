@@ -1,0 +1,43 @@
+{
+  "base_model": "mistralai/Mistral-7B-v0.1",
+  "models": [
+    "WildMarcoroni-Variant1-7B",
+    "WestSeverus-7B-DPO-v2"
+  ],
+  "pruning": {
+    "method": "nm",
+    "n": 64,
+    "m": 256,
+    "consensus": "ties"
+  },
+  "awa": {
+    "popsize": null,
+    "n_generations": 30,
+    "bounds": [0.1, 2.0],
+    "sigma0": 0.05,
+    "alpha": 100.0,
+    "beta": 1.0,
+    "seed": 0
+  },
+  "tasks": [
+    {
+      "name": "task_calib_a",
+      "data": "calibration/task_a.jsonl",
+      "max_examples": 48,
+      "max_len": 1024
+    },
+    {
+      "name": "task_calib_b",
+      "data": "calibration/task_b.jsonl",
+      "max_examples": 48,
+      "max_len": 1024
+    }
+  ],
+  "device": "cuda",
+  "dtype": "float16",
+  "batch_size": 2,
+  "max_examples": 48,
+  "max_len": 1024,
+  "output_dir": "cabs_plus_output",
+  "save_merged": false
+}

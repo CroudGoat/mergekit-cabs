@@ -1,0 +1,25 @@
+# CABS+ (arXiv:2608.12842) recipe: 2-model merge with AWA-optimal coefficients.
+#
+# The `weight` values below are placeholders - run the AWA search to obtain
+# the optimal lambda* for your tasks:
+#
+#   mergekit-cabs awa --config awa_config.example.json
+#
+# and paste the resulting values (see awa_result.json / cabs_plus_recipe.yml).
+models:
+  - model: WildMarcoroni-Variant1-7B
+    parameters:
+      weight: 1.15        # lambda*_A  (from AWA)
+      n: 64
+      m: 256
+  - model: WestSeverus-7B-DPO-v2
+    parameters:
+      weight: 0.95        # lambda*_B  (from AWA)
+      n: 64
+      m: 256
+
+merge_method: cabs_plus
+base_model: mistralai/Mistral-7B-v0.1
+dtype: float16
+parameters:
+  consensus: ties   # TIES-style majority-sign handling of the overlap region

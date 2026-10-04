@@ -1,0 +1,21 @@
+# CABS (ICML 2025) recipe: 2-model merge on Mistral-7B-v0.1
+#
+# CA pruning priority follows the model list order (first = highest priority).
+# n:m = 64:256 is the configuration used in the official CABS 7B experiments;
+# weights 1.2 correspond to the official recipes (found by grid search in the
+# original paper).
+models:
+  - model: WildMarcoroni-Variant1-7B
+    parameters:
+      weight: 1.2
+      n: 64
+      m: 256
+  - model: WestSeverus-7B-DPO-v2
+    parameters:
+      weight: 1.2
+      n: 64
+      m: 256
+
+merge_method: cabs
+base_model: mistralai/Mistral-7B-v0.1
+dtype: float16

@@ -1,0 +1,40 @@
+# mergekit-cabs
+# SPDX-License-Identifier: MIT
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mergekit-cabs"
+version = "0.1.0"
+description = "CABS (ICML 2025) and CABS+ (arXiv:2608.12842) model merging for mergekit"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "mergekit-cabs contributors" }]
+keywords = ["mergekit", "model-merging", "task-vectors", "cabs", "cabs-plus"]
+dependencies = [
+    "torch>=2.0",
+    "numpy",
+]
+
+[project.optional-dependencies]
+# Everything needed to run model loading / AWA search / mergekit recipes.
+full = [
+    "mergekit>=0.1",
+    "transformers>=4.40",
+    "safetensors>=0.4",
+    "pyyaml",
+    "click>=8.1",
+]
+dev = ["pytest>=7"]
+
+[project.scripts]
+mergekit-cabs = "mergekit_cabs.cli:main"
+mergekit-cabs-yaml = "mergekit_cabs.cli:_yaml_entry"
+
+[tool.setuptools.packages.find]
+include = ["mergekit_cabs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
