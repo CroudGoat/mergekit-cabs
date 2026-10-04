@@ -67,10 +67,22 @@ Step 0 から順に実行すれば、インストール直後からマージ済�
 ```bash
 git clone https://github.com/CroudGoat/mergekit-cabs.git
 cd mergekit-cabs
-pip install -e ".[full]"     # mergekit / transformers / safetensors 等を含む
+pip install -e ".[full]"     # mergekit（GitHub main 版）/ transformers / safetensors 等を含む
 pip install -e ".[dev]"      # テスト実行用（pytest）
 pytest tests/ -q             # 30 tests が pass すれば環境 OK
 ```
+
+> **重要**: 本パッケージは mergekit の**新しいプラグイン API**（`BasePolicy` /
+> `GroupMergeMethod` 等）に依存します。この API は GitHub main にのみ存在し、
+> PyPI のリリースには含まれていません。`[full]` は mergekit を GitHub main から
+> 直接取得するため、通常は追加操作不要です。**すでに PyPI 版 mergekit をインストール済み**
+> の場合は入れ替えてください:
+>
+> ```bash
+> pip uninstall -y mergekit
+> pip install git+https://github.com/arcee-ai/mergekit.git
+> python -c "from mergekit.merge_methods.base import BasePolicy; print('mergekit API OK')"
+> ```
 
 ### Step 2: モデルの準備
 
@@ -157,6 +169,7 @@ mergekit-cabs awa --config awa_config.json
 | 症状 | 対処 |
 |------|------|
 | `Unknown merge method: cabs` | 素の `mergekit-yaml` ではなく **`mergekit-cabs-yaml`** を使う（メソッド登録は本パッケージの import 時に行われる） |
+| `ImportError: cannot import name 'BasePolicy'` | PyPI 版 mergekit（旧 API）が入っている。`pip uninstall -y mergekit && pip install git+https://github.com/arcee-ai/mergekit.git` で入れ替え |
 | CUDA out of memory | `--low-cpu-memory` を追加 / `m` を小さくしてスパース化を強める / `dtype: float16` を確認 |
 | CPU で遅い・メモリ不足 | `--lazy-unpickle` を必ず付ける。まず 0.5B〜1B 級で試す |
 | ゲート付きモデルで 401 エラー | `huggingface-cli login` 後に再実行 |

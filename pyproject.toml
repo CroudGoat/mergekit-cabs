@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mergekit-cabs"
-version = "0.1.0"
+version = "0.1.1"
 description = "CABS (ICML 2025) and CABS+ (arXiv:2608.12842) model merging for mergekit"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 # Everything needed to run model loading / AWA search / mergekit recipes.
 full = [
-    "mergekit>=0.1",
+    "mergekit @ git+https://github.com/arcee-ai/mergekit.git",
     "transformers>=4.40",
     "safetensors>=0.4",
     "pyyaml",

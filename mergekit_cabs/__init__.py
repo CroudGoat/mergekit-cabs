@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = ["register", "registered_variants", "CABS", "CABS_PLUS"]
 
@@ -37,7 +37,17 @@ def register(force: bool = False) -> None:
     Idempotent by default; pass ``force=True`` to overwrite existing
     registrations (useful when reloading a modified implementation).
     """
-    from mergekit.merge_methods import registry
+    try:
+        from mergekit.merge_methods import registry
+    except ModuleNotFoundError as _e:  # pragma: no cover
+        if str(getattr(_e, "name", "") or "").startswith("mergekit"):
+            raise ImportError(
+                "mergekit is not installed. Install it from GitHub main "
+                "(the PyPI release lacks the plugin API we need):\n"
+                "  pip install git+https://github.com/arcee-ai/mergekit.git\n"
+                "or simply: pip install -e \".[full]\""
+            ) from _e
+        raise
 
     cabs, cabs_plus = _import_methods()
     for method in (cabs, cabs_plus):

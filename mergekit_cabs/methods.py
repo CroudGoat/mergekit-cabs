@@ -46,15 +46,30 @@ from typing import Any, Optional
 import torch
 from typing_extensions import Literal
 
-from mergekit.merge_methods.base import (
-    BasePolicy,
-    GroupMergeMethod,
-    InputContract,
-    MergeMethodSpec,
-    ParameterScope,
-    ParameterSpec,
-    TensorGroup,
-)
+try:
+    from mergekit.merge_methods.base import (
+        BasePolicy,
+        GroupMergeMethod,
+        InputContract,
+        MergeMethodSpec,
+        ParameterScope,
+        ParameterSpec,
+        TensorGroup,
+    )
+except ImportError as _e:  # pragma: no cover
+    # mergekit missing entirely, or an outdated PyPI release that predates
+    # the plugin merge-method API (BasePolicy / GroupMergeMethod / ...).
+    _name = str(getattr(_e, "name", "") or "")
+    if _name.startswith("mergekit") or "BasePolicy" in str(_e):
+        raise ImportError(
+            "mergekit-cabs requires a recent mergekit with the plugin "
+            "merge-method API (mergekit.merge_methods.base.BasePolicy). "
+            "The PyPI release predates this API - install mergekit from "
+            "GitHub main instead:\n"
+            "  pip uninstall -y mergekit\n"
+            "  pip install git+https://github.com/arcee-ai/mergekit.git"
+        ) from _e
+    raise
 
 from .sparsify import ConsensusMethod, PruneMethod, conflict_aware_masks
 
